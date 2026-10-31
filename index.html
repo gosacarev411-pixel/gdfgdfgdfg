@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>СФЕРА — Онлайн Арена</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            user-select: none;
+        }
+        
+        #gameCanvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            cursor: none;
+        }
+        
+        .screen {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            background: radial-gradient(circle at center, #0a0a1a 0%, #000 100%);
+        }
+        
+        .hidden { display: none !important; }
+        
+        h1 {
+            font-size: 48px;
+            letter-spacing: 8px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00ff88, #00aaff, #ff00aa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: glow 3s ease-in-out infinite;
+        }
+        
+        @keyframes glow {
+            0%, 100% { filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.5)); }
+            50% { filter: drop-shadow(0 0 30px rgba(0, 170, 255, 0.8)); }
+        }
+        
+        .subtitle {
+            font-size: 12px;
+            opacity: 0.6;
+            margin-bottom: 40px;
+            letter-spacing: 4px;
+        }
+        
+        .menu-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            color: #fff;
+            padding: 15px 40px;
+            margin: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            letter-spacing: 3px;
+            cursor: pointer;
+            border-radius: 4px;
+            min-width: 280px;
+            transition: all 0.3s;
+        }
+        
+        .menu-btn:hover {
+            background: rgba(0, 255, 136, 0.15);
+            border-color: #00ff88;
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+        
+        .menu-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        .input-field {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 12px 20px;
+            margin: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-align: center;
+            border-radius: 4px;
+            min-width: 280px;
+            letter-spacing: 2px;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: #00ff88;
+        }
+        
+        #status {
+            margin-top: 20px;
+            font-size: 11px;
+            opacity: 0.7;
+            letter-spacing: 2px;
+            min-height: 20px;
+        }
+        
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 8px 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 4px;
+            z-index: 200;
+        }
+        
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 50;
+            font-size: 11px;
+            letter-spacing: 2px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 12px 18px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        #hud .line { margin-bottom: 5px; }
+        #hud .value { color: #00ff88; font-weight: bold; }
+        
+        #leaderboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 50;
+            font-size: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 12px 18px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 180px;
+        }
+        
+        #leaderboard h3 {
+            font-size: 11px;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+            color: #00ff88;
+        }
+        
+        .lb-entry {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            opacity: 0.9;
+        }
+        
+        .lb-entry.me { color: #00ff88; font-weight: bold; }
+        
+        #roomCode {
+            font-size: 24px;
+            letter-spacing: 6px;
+            color: #00ff88;
+            margin: 20px 0;
+            padding: 15px 30px;
+            border: 1px dashed rgba(0, 255, 136, 0.5);
+            border-radius: 4px;
+            background: rgba(0, 255, 136, 0.05);
+        }
+        
+        #gameOver {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 150;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px 60px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 0, 100, 0.5);
+        }
+        
+        #gameOver h2 {
+            font-size: 32px;
+            color: #ff0064;
+            letter-spacing: 4px;
+            margin-bottom: 15px;
+        }
+        
+        #gameOver .stats {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(0, 255, 136, 0.3);
+            border-top-color: #00ff88;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- ГЛАВНОЕ МЕНЮ -->
+    <div id="mainMenu" class="screen">
+        <h1>СФЕРА</h1>
+        <div class="subtitle">ОНЛАЙН АРЕНА</div>
+        <button class="menu-btn" id="btnQuickMatch">⚡ БЫСТРЫЙ ПОИСК</button>
+        <button class="menu-btn" id="btnCreateRoom">🏠 СОЗДАТЬ КОМНАТУ</button>
+        <button class="menu-btn" id="btnJoinRoom">🔗 ПРИСОЕДИНИТЬСЯ</button>
+        <div id="status"></div>
+    </div>
+    
+    <!-- СОЗДАНИЕ КОМНАТЫ -->
+    <div id="createRoomScreen" class="screen hidden">
+        <button class="back-btn" data-back="mainMenu">← НАЗАД</button>
+        <h1>КОМНАТА</h1>
+        <div class="subtitle">ПОДЕЛИСЬ КОДОМ С ДРУЗЬЯМИ</div>
+        <div id="roomCode">------</div>
+        <div id="status">Ожидание игроков<span class="loading"></span></div>
+        <button class="menu-btn" id="btnStartGame">▶ НАЧАТЬ ИГРУ</button>
+    </div>
+    
+    <!-- ПРИСОЕДИНЕНИЕ -->
+    <div id="joinRoomScreen" class="screen hidden">
+        <button class="back-btn" data-back="mainMenu">← НАЗАД</button>
+        <h1>ВОЙТИ</h1>
+        <div class="subtitle">ВВЕДИ КОД КОМНАТЫ</div>
+        <input type="text" class="input-field" id="roomCodeInput" placeholder="КОД КОМНАТЫ" maxlength="8">
+        <button class="menu-btn" id="btnJoin">🔗 ПОДКЛЮЧИТЬСЯ</button>
+        <div id="status"></div>
+    </div>
+    
+    <!-- HUD В ИГРЕ -->
+    <div id="hud" class="hidden">
+        <div class="line">РАЗМЕР: <span class="value" id="mySize">10</span></div>
+        <div class="line">СЧЁТ: <span class="value" id="myScore">0</span></div>
+        <div class="line">ИГРОКОВ: <span class="value" id="playerCount">0</span></div>
+    </div>
+    
+    <div id="leaderboard" class="hidden">
+        <h3>🏆 ТОП</h3>
+        <div id="lbList"></div>
+    </div>
+    
+    <!-- GAME OVER -->
+    <div id="gameOver" class="hidden">
+        <h2>ПОГЛОЩЁН</h2>
+        <div class="stats">
+            СЧЁТ: <span id="finalScore">0</span><br>
+            МЕСТО: <span id="finalPlace">0</span>
+        </div>
+        <button class="menu-btn" id="btnRespawn">🔄 ВОЗРОДИТЬСЯ</button>
+        <button class="menu-btn" id="btnExit">🚪 В МЕНЮ</button>
+    </div>
+
+    <script>
+        // ============ НАСТРОЙКИ ============
+        const CONFIG = {
+            WORLD_SIZE: 3000,
+            FOOD_COUNT: 300,
+            START_SIZE: 15,
+            MAX_SIZE: 200,
+            BASE_SPEED: 3,
+            PEER_PREFIX: 'sfera-arena-',
+            MATCHMAKING_ROOM: 'sfera-global-lobby'
+        };
+        
+        // ============ СОСТОЯНИЕ ============
+        const state = {
+            peer: null,
+            connections: [],
+            isHost: false,
+            myId: null,
+            myName: 'ИГРОК_' + Math.floor(Math.random() * 9999),
+            roomId: null,
+            gameStarted: false,
+            players: {},
+            foods: [],
+            camera: { x: 0, y: 0 },
+            mouse: { x: 0, y: 0 },
+            me: null,
+            leaderboard: []
+        };
+        
+        // ============ CANVAS ============
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let W = canvas.width = window.innerWidth;
+        let H = canvas.height = window.innerHeight;
+        
+        window.addEventListener('resize', () => {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        });
+        
+        // ============ UI ============
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+            if (id) document.getElementById(id).classList.remove('hidden');
+            
+            const inGame = id === null;
+            document.getElementById('hud').classList.toggle('hidden', !inGame);
+            document.getElementById('leaderboard').classList.toggle('hidden', !inGame);
+        }
+        
+        function setStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
+        
+        document.querySelectorAll('[data-back]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                showScreen(btn.dataset.back);
+                setStatus('');
+            });
+        });
+        
+        // ============ PEER CONNECTION ============
+        function initPeer(id) {
+            return new Promise((resolve, reject) => {
+                state.peer = new Peer(id || undefined, {
+                    debug: 0
+                });
+                
+                state.peer.on('open', (peerId) => {
+                    state.myId = peerId;
+                    resolve(peerId);
+                });
+                
+                state.peer.on('connection', (conn) => {
+                    handleConnection(conn);
+                });
+                
+                state.peer.on('error', (err) => {
+                    console.error('Peer error:', err);
+                    setStatus('ОШИБКА: ' + err.type);
+                    reject(err);
+                });
+            });
+        }
+        
+        function handleConnection(conn) {
+            conn.on('open', () => {
+                state.connections.push(conn);
+                console.log('Подключен:', conn.peer);
+                
+                // Отправляем своё состояние
+                conn.send({
+                    type: 'hello',
+                    name: state.myName,
+                    id: state.myId
+                });
+                
+                // Если хост и игра началась — отправляем состояние мира
+                if (state.isHost && state.gameStarted) {
+                    conn.send({
+                        type: 'worldState',
+                        foods: state.foods,
+                        players: state.players
+                    });
+                }
+            });
+            
+            conn.on('data', (data) => handleData(conn, data));
+            
+            conn.on('close', () => {
+                state.connections = state.connections.filter(c => c !== conn);
+                // Удаляем игрока
+                const playerId = conn.peer;
+                if (state.players[playerId]) {
+                    delete state.players[playerId];
+                    broadcast({ type: 'playerLeft', id: playerId });
+                }
+            });
+        }
+        
+        function handleData(conn, data) {
+            switch(data.type) {
+                case 'hello':
+                    // Новый игрок представился
+                    if (!state.players[conn.peer]) {
+                        state.players[conn.peer] = createPlayer(conn.peer, data.name);
+                        broadcast({ 
+                            type: 'playerJoined', 
+                            id: conn.peer, 
+                            name: data.name 
+                        }, conn);
+                    }
+                    break;
+                    
+                case 'playerJoined':
+                    state.players[data.id] = createPlayer(data.id, data.name);
+                    break;
+                    
+                case 'playerLeft':
+                    delete state.players[data.id];
+                    break;
+                    
+                case 'move':
+                    if (state.players[conn.peer]) {
+                        state.players[conn.peer].x = data.x;
+                        state.players[conn.peer].y = data.y;
+                        state.players[conn.peer].size = data.size;
+                        state.players[conn.peer].score = data.score;
+                        state.players[conn.peer].alive = data.alive;
+                    }
+                    break;
+                    
+                case 'worldState':
+                    // Клиент получает мир от хоста
+                    state.foods = data.foods;
+                    Object.assign(state.players, data.players);
+                    break;
+                    
+                case 'foodEaten':
+                    if (state.foods[data.index]) {
+                        state.foods[data.index].eaten = true;
+                    }
+                    break;
+                    
+                case 'playerEaten':
+                    if (state.players[data.victimId]) {
+                        state.players[data.victimId].alive = false;
+                        state.players[data.victimId].size = CONFIG.START_SIZE;
+                    }
+                    if (state.players[data.eaterId]) {
+                        state.players[data.eaterId].size = Math.min(CONFIG.MAX_SIZE, 
+                            state.players[data.eaterId].size + data.victimSize * 0.5);
+                    }
+                    if (data.victimId === state.myId) {
+                        showGameOver();
+                    }
+                    break;
+                    
+                case 'startGame':
+                    state.gameStarted = true;
+                    startGameClient();
+                    break;
+            }
+        }
+        
+        function broadcast(data, excludeConn = null) {
+            state.connections.forEach(conn => {
+                if (conn !== excludeConn && conn.open) {
+                    conn.send(data);
+                }
+            });
+        }
+        
+        // ============ ИГРОКИ И ЕДА ============
+        function createPlayer(id, name) {
+            return {
+                id: id,
+                name: name,
+                x: Math.random() * CONFIG.WORLD_SIZE,
+                y: Math.random() * CONFIG.WORLD_SIZE,
+                size: CONFIG.START_SIZE,
+                score: 0,
+                alive: true,
+                color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+                vx: 0,
+                vy: 0
+            };
+        }
+        
+        function spawnFood() {
+            return {
+                x: Math.random() * CONFIG.WORLD_SIZE,
+                y: Math.random() * CONFIG.WORLD_SIZE,
+                size: 3 + Math.random() * 4,
+                color: `hsl(${Math.random() * 360}, 80%, 60%)`,
+                eaten: false
+            };
+        }
+        
+        function initWorld() {
+            state.foods = [];
+            for (let i = 0; i < CONFIG.FOOD_COUNT; i++) {
+                state.foods.push(spawnFood());
+            }
+            
+            // Создаём себя
+            state.me = createPlayer(state.myId, state.myName);
+            state.players[state.myId] = state.me;
+        }
+        
+        // ============ УПРАВЛЕНИЕ ============
+        canvas.addEventListener('mousemove', (e) => {
+            state.mouse.x = e.clientX;
+            state.mouse.y = e.clientY;
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            state.mouse.x = e.touches[0].clientX;
+            state.mouse.y = e.touches[0].clientY;
+        }, { passive: false });
+        
+        // ============ ИГРОВОЙ ЦИКЛ ============
+        function updateGame() {
+            if (!state.gameStarted || !state.me || !state.me.alive) return;
+            
+            // Движение к курсору
+            const dx = state.mouse.x - W / 2;
+            const dy = state.mouse.y - H / 2;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > 5) {
+                const speed = CONFIG.BASE_SPEED * (CONFIG.START_SIZE / state.me.size) * 1.5;
+                state.me.vx = (dx / dist) * speed;
+                state.me.vy = (dy / dist) * speed;
+            } else {
+                state.me.vx *= 0.9;
+                state.me.vy *= 0.9;
+            }
+            
+            state.me.x += state.me.vx;
+            state.me.y += state.me.vy;
+            
+            // Границы мира
+            state.me.x = Math.max(state.me.size, Math.min(CONFIG.WORLD_SIZE - state.me.size, state.me.x));
+            state.me.y = Math.max(state.me.size, Math.min(CONFIG.WORLD_SIZE - state.me.size, state.me.y));
+            
+            // Поедание еды
+            state.foods.forEach((food, idx) => {
+                if (food.eaten) return;
+                const fdx = food.x - state.me.x;
+                const fdy = food.y - state.me.y;
+                const fdist = Math.sqrt(fdx * fdx + fdy * fdy);
+                
+                if (fdist < state.me.size) {
+                    food.eaten = true;
+                    state.me.size = Math.min(CONFIG.MAX_SIZE, state.me.size + food.size * 0.1);
+                    state.me.score += Math.floor(food.size);
+                    
+                    if (state.isHost) {
+                        broadcast({ type: 'foodEaten', index: idx });
+                    } else {
+                        // Клиент отправляет хосту
+                        state.connections[0]?.send({ type: 'foodEaten', index: idx });
+                    }
+                }
+            });
+            
+            // Респавн еды (только хост)
+            if (state.isHost) {
+                const aliveFood = state.foods.filter(f => !f.eaten).length;
+                if (aliveFood < CONFIG.FOOD_COUNT && Math.random() < 0.3) {
+                    state.foods.push(spawnFood());
+                }
+                // Очистка съеденной
+                if (state.foods.length > CONFIG.FOOD_COUNT * 2) {
+                    state.foods = state.foods.filter(f => !f.eaten);
+                }
+            }
+            
+            // Поедание игроков
+            Object.values(state.players).forEach(other => {
+                if (other.id === state.me.id || !other.alive) return;
+                const pdx = other.x - state.me.x;
+                const pdy = other.y - state.me.y;
+                const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
+                
+                // Я больше и поглотил
+                if (state.me.size > other.size * 1.15 && pdist < state.me.size - other.size * 0.5) {
+                    state.me.size = Math.min(CONFIG.MAX_SIZE, state.me.size + other.size * 0.5);
+                    state.me.score += Math.floor(other.size);
+                    
+                    if (state.isHost) {
+                        broadcast({ 
+                            type: 'playerEaten', 
+                            eaterId: state.me.id, 
+                            victimId: other.id,
+                            victimSize: other.size
+                        });
+                    }
+                    
+                    if (other.id === state.myId) {
+                        showGameOver();
+                    } else {
+                        other.alive = false;
+                        other.size = CONFIG.START_SIZE;
+                        // Респавн через 3 сек
+                        setTimeout(() => {
+                            if (state.players[other.id]) {
+                                state.players[other.id].alive = true;
+                                state.players[other.id].x = Math.random() * CONFIG.WORLD_SIZE;
+                                state.players[other.id].y = Math.random() * CONFIG.WORLD_SIZE;
+                            }
+                        }, 3000);
+                    }
+                }
+                // Меня съели
+                else if (other.size > state.me.size * 1.15 && pdist < other.size - state.me.size * 0.5) {
+                    state.me.alive = false;
+                    showGameOver();
+                    setTimeout(() => {
+                        state.me.alive = true;
+                        state.me.size = CONFIG.START_SIZE;
+                        state.me.x = Math.random() * CONFIG.WORLD_SIZE;
+                        state.me.y = Math.random() * CONFIG.WORLD_SIZE;
+                        state.me.score = 0;
+                        document.getElementById('gameOver').classList.add('hidden');
+                    }, 3000);
+                }
+            });
+            
+            // Камера
+            state.camera.x = state.me.x - W / 2;
+            state.camera.y = state.me.y - H / 2;
+            
+            // Отправка своего состояния
+            const moveData = {
+                type: 'move',
+                x: state.me.x,
+                y: state.me.y,
+                size: state.me.size,
+                score: state.me.score,
+                alive: state.me.alive
+            };
+            
+            if (state.isHost) {
+                broadcast(moveData);
+                // Хост рассылает мир клиентам
+                if (Math.random() < 0.1) {
+                    broadcast({
+                        type: 'worldState',
+                        foods: state.foods.filter(f => !f.eaten),
+                        players: state.players
+                    });
+                }
+            } else if (state.connections[0]) {
+                state.connections[0].send(moveData);
+            }
+            
+            // Обновление HUD
+            document.getElementById('mySize').textContent = Math.floor(state.me.size);
+            document.getElementById('myScore').textContent = state.me.score;
+            document.getElementById('playerCount').textContent = Object.values(state.players).filter(p => p.alive).length;
+            
+            // Лидерборд
+            updateLeaderboard();
+        }
+        
+        function updateLeaderboard() {
+            const sorted = Object.values(state.players)
+                .filter(p => p.alive)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5);
+            
+            const list = document.getElementById('lbList');
+            list.innerHTML = sorted.map((p, i) => `
+                <div class="lb-entry ${p.id === state.myId ? 'me' : ''}">
+                    <span>${i + 1}. ${p.name.substring(0, 10)}</span>
+                    <span>${p.score}</span>
+                </div>
+            `).join('');
+        }
+        
+        // ============ РЕНДЕР ============
+        function render() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, W, H);
+            
+            if (!state.gameStarted) {
+                requestAnimationFrame(render);
+                return;
+            }
+            
+            ctx.save();
+            ctx.translate(-state.camera.x, -state.camera.y);
+            
+            // Сетка
+            ctx.strokeStyle = 'rgba(0, 255, 136, 0.05)';
+            ctx.lineWidth = 1;
+            const gridSize = 100;
+            const startX = Math.floor(state.camera.x / gridSize) * gridSize;
+            const startY = Math.floor(state.camera.y / gridSize) * gridSize;
+            
+            for (let x = startX; x < state.camera.x + W + gridSize; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, state.camera.y);
+                ctx.lineTo(x, state.camera.y + H);
+                ctx.stroke();
+            }
+            for (let y = startY; y < state.camera.y + H + gridSize; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(state.camera.x, y);
+                ctx.lineTo(state.camera.x + W, y);
+                ctx.stroke();
+            }
+            
+            // Границы мира
+            ctx.strokeStyle = 'rgba(255, 0, 100, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(0, 0, CONFIG.WORLD_SIZE, CONFIG.WORLD_SIZE);
+            
+            // Еда
+            state.foods.forEach(food => {
+                if (food.eaten) return;
+                if (!isVisible(food.x, food.y, 20)) return;
+                
+                ctx.beginPath();
+                ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+                ctx.fillStyle = food.color;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(food.x, food.y, food.size * 2, 0, Math.PI * 2);
+                ctx.fillStyle = food.color.replace('60%', '60%').replace(')', ', 0.2)').replace('hsl', 'hsla');
+                ctx.fill();
+            });
+            
+            // Игроки
+            Object.values(state.players).forEach(player => {
+                if (!player.alive) return;
+                if (!isVisible(player.x, player.y, player.size * 2)) return;
+                
+                // Свечение
+                const gradient = ctx.createRadialGradient(
+                    player.x, player.y, player.size * 0.5,
+                    player.x, player.y, player.size * 1.5
+                );
+                gradient.addColorStop(0, player.color);
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.size * 1.5, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                // Тело
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+                ctx.fillStyle = player.color;
+                ctx.fill();
+                
+                // Обводка
+                ctx.strokeStyle = player.id === state.myId ? '#fff' : 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = player.id === state.myId ? 3 : 1;
+                ctx.stroke();
+                
+                // Имя
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(player.name, player.x, player.y - player.size - 10);
+            });
+            
+            ctx.restore();
+            
+            requestAnimationFrame(render);
+        }
+        
+        function isVisible(x, y, margin) {
+            return x > state.camera.x - margin && 
+                   x < state.camera.x + W + margin &&
+                   y > state.camera.y - margin && 
+                   y < state.camera.y + H + margin;
+        }
+        
+        // ============ GAME LOOP ============
+        setInterval(updateGame, 1000 / 60);
+        render();
+        
+        // ============ МЕНЮ ДЕЙСТВИЯ ============
+        document.getElementById('btnQuickMatch').addEventListener('click', async () => {
+            setStatus('ПОДКЛЮЧЕНИЕ К СЕРВЕРУ...');
+            try {
+                await initPeer();
+                // Подключаемся к глобальной комнате
+                const conn = state.peer.connect(CONFIG.MATCHMAKING_ROOM);
+                handleConnection(conn);
+                
+                state.roomId = CONFIG.MATCHMAKING_ROOM;
+                state.isHost = false;
+                
+                setTimeout(() => {
+                    initWorld();
+                    state.gameStarted = true;
+                    showScreen(null);
+                }, 1500);
+            } catch (e) {
+                setStatus('ОШИБКА ПОДКЛЮЧЕНИЯ');
+            }
+        });
+        
+        document.getElementById('btnCreateRoom').addEventListener('click', async () => {
+            setStatus('СОЗДАНИЕ КОМНАТЫ...');
+            try {
+                const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+                await initPeer(CONFIG.PEER_PREFIX + roomId);
+                
+                state.roomId = roomId;
+                state.isHost = true;
+                
+                document.getElementById('roomCode').textContent = roomId;
+                showScreen('createRoomScreen');
+                setStatus('Ожидание игроков...');
+                
+                initWorld();
+            } catch (e) {
+                setStatus('ОШИБКА СОЗДАНИЯ');
+            }
+        });
+        
+        document.getElementById('btnStartGame').addEventListener('click', () => {
+            state.gameStarted = true;
+            showScreen(null);
+            broadcast({ type: 'startGame' });
+        });
+        
+        document.getElementById('btnJoinRoom').addEventListener('click', () => {
+            showScreen('joinRoomScreen');
+        });
+        
+        document.getElementById('btnJoin').addEventListener('click', async () => {
+            const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (!code) {
+                setStatus('ВВЕДИ КОД');
+                return;
+            }
+            
+            setStatus('ПОДКЛЮЧЕНИЕ...');
+            try {
+                await initPeer();
+                const conn = state.peer.connect(CONFIG.PEER_PREFIX + code);
+                handleConnection(conn);
+                
+                state.roomId = code;
+                state.isHost = false;
+                
+                setTimeout(() => {
+                    initWorld();
+                    state.gameStarted = true;
+                    showScreen(null);
+                }, 1500);
+            } catch (e) {
+                setStatus('КОМНАТА НЕ НАЙДЕНА');
+            }
+        });
+        
+        function showGameOver() {
+            const sorted = Object.values(state.players).sort((a, b) => b.score - a.score);
+            const place = sorted.findIndex(p => p.id === state.myId) + 1;
+            
+            document.getElementById('finalScore').textContent = state.me.score;
+            document.getElementById('finalPlace').textContent = place + ' / ' + sorted.length;
+            document.getElementById('gameOver').classList.remove('hidden');
+        }
+        
+        document.getElementById('btnRespawn').addEventListener('click', () => {
+            state.me.alive = true;
+            state.me.size = CONFIG.START_SIZE;
+            state.me.score = 0;
+            state.me.x = Math.random() * CONFIG.WORLD_SIZE;
+            state.me.y = Math.random() * CONFIG.WORLD_SIZE;
+            document.getElementById('gameOver').classList.add('hidden');
+        });
+        
+        document.getElementById('btnExit').addEventListener('click', () => {
+            if (state.peer) state.peer.destroy();
+            state.connections = [];
+            state.players = {};
+            state.foods = [];
+            state.gameStarted = false;
+            document.getElementById('gameOver').classList.add('hidden');
+            showScreen('mainMenu');
+        });
+    </script>
+</body>
+</html>
